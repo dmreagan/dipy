@@ -326,6 +326,58 @@ def streamtube(lines, colors=None, opacity=1, linewidth=0.1, tube_sides=9,
         poly_mapper.UseLookupTableScalarRangeOn()
         poly_mapper.Update()
 
+
+
+
+    
+    # METHOD #1
+    # Modify the shader to color based on model normal
+    # To do this we have to modify the vertex shader
+    # to pass the normal in model coordinates
+    # through to the fragment shader. By default the normal
+    # is converted to View coordinates and then passed on.
+    # We keep that, but add a varying for the original normal.
+    # Then we modify the fragment shader to set the diffuse color
+    # based on that normal. First lets modify the vertex
+    # shader
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::Normal::Dec", # replace the normal block
+        True, # before the standard replacements
+        "//VTK::Normal::Dec\n" # we still want the default
+        "  varying vec3 myNormalMCVSOutput;\n", #but we add this
+        False # only do it once
+    )
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::Normal::Impl", # replace the normal block
+        True, # before the standard replacements
+        "//VTK::Normal::Impl\n" # we still want the default
+        "  myNormalMCVSOutput = normalMC;\n", #but we add this
+        False # only do it once
+    )
+    # now modify the fragment shader
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,  # in the fragment shader
+        "//VTK::Normal::Dec", # replace the normal block
+        True, # before the standard replacements
+        "//VTK::Normal::Dec\n" # we still want the default
+        "  varying vec3 myNormalMCVSOutput;\n", #but we add this
+        False # only do it once
+    )
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,  # in the fragment shader
+        "//VTK::Normal::Impl", # replace the normal block
+        True, # before the standard replacements
+        "//VTK::Normal::Impl\n" # we still want the default calc
+        "  diffuseColor = abs(myNormalMCVSOutput);\n", #but we add this
+        False # only do it once
+    )
+    
+
+
+    
+
     # Set Actor
     if lod:
         actor = vtk.vtkLODActor()
