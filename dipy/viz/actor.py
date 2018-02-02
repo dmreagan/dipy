@@ -581,6 +581,175 @@ def line(lines, colors=None, opacity=1, linewidth=1,
     return actor
 
 
+def halo_line(lines, colors=None, opacity=1, linewidth=1,
+              spline_subdiv=None, lod=True, lod_points=10 ** 4,
+              lod_points_size=3, lookup_colormap=None):
+    """ Create an actor for one or more lines.
+
+    Parameters
+    ------------
+    lines :  list of arrays
+
+    colors : array (N, 3), list of arrays, tuple (3,), array (K,), None
+        If None then a standard orientation colormap is used for every line.
+        If one tuple of color is used. Then all streamlines will have the same
+        colour.
+        If an array (N, 3) is given, where N is equal to the number of lines.
+        Then every line is coloured with a different RGB color.
+        If a list of RGB arrays is given then every point of every line takes
+        a different color.
+        If an array (K, ) is given, where K is the number of points of all
+        lines then these are considered as the values to be used by the
+        colormap.
+        If an array (L, ) is given, where L is the number of streamlines then
+        these are considered as the values to be used by the colormap per
+        streamline.
+        If an array (X, Y, Z) or (X, Y, Z, 3) is given then the values for the
+        colormap are interpolated automatically using trilinear interpolation.
+
+    opacity : float, optional
+        Takes values from 0 (fully transparent) to 1 (opaque). Default is 1.
+
+    linewidth : float, optional
+        Line thickness. Default is 1.
+    spline_subdiv : int, optional
+        Number of splines subdivision to smooth streamtubes. Default is None
+        which means no subdivision.
+    lod : bool
+        Use vtkLODActor(level of detail) rather than vtkActor. Default is True.
+        Level of detail actors do not render the full geometry when the
+        frame rate is low.
+    lod_points : int
+        Number of points to be used when LOD is in effect. Default is 10000.
+    lod_points_size : int
+        Size of points when lod is in effect. Default is 3.
+    lookup_colormap : bool, optional
+        Add a default lookup table to the colormap. Default is None which calls
+        :func:`dipy.viz.actor.colormap_lookup_table`.
+
+    Returns
+    ----------
+    v : vtkActor or vtkLODActor object
+        Line.
+
+    Examples
+    ----------
+    >>> from dipy.viz import actor, window
+    >>> ren = window.Renderer()
+    >>> lines = [np.random.rand(10, 3), np.random.rand(20, 3)]
+    >>> colors = np.random.rand(2, 3)
+    >>> c = actor.line(lines, colors)
+    >>> ren.add(c)
+    >>> #window.show(ren)
+    """
+    # Poly data with lines and colors
+    poly_data, is_colormap = lines_to_vtk_polydata(lines, colors)
+    next_input = poly_data
+
+    # use spline interpolation
+    # if (spline_subdiv is not None) and (spline_subdiv > 0):
+    #     spline_filter = set_input(vtk.vtkSplineFilter(), next_input)
+    #     spline_filter.SetSubdivideToSpecified()
+    #     spline_filter.SetNumberOfSubdivisions(spline_subdiv)
+    #     spline_filter.Update()
+    #     next_input = spline_filter.GetOutputPort()
+
+    poly_mapper = set_input(vtk.vtkOpenGLPolyDataMapper(), next_input)
+    # poly_mapper.ScalarVisibilityOn()
+    # poly_mapper.SetScalarModeToUsePointFieldData()
+    # poly_mapper.SelectColorArray("Colors")
+    poly_mapper.Update()
+
+    # print(next_input.GetPointData())
+
+    poly_mapper.MapDataArrayToVertexAttribute("barfoo", "foobar", vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, -1)
+
+
+
+    # Modify the shader to color based on model normal
+    # To do this we have to modify the vertex shader
+    # to pass the normal in model coordinates
+    # through to the fragment shader. By default the normal
+    # is converted to View coordinates and then passed on.
+    # We keep that, but add a varying for the original normal.
+    # Then we modify the fragment shader to set the diffuse color
+    # based on that normal. First lets modify the vertex
+    # shader
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::Normal::Dec", # replace the normal block
+        True, # before the standard replacements
+        "//VTK::Normal::Dec\n" # we still want the default
+        "  varying vec3 myNormalMCVSOutput;\n"
+        "  in vec3 barfoo;\n"
+        "  out vec3 barfooVSOutput;\n", #but we add this
+        False # only do it once
+    )
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::Normal::Impl", # replace the normal block
+        True, # before the standard replacements
+        "//VTK::Normal::Impl\n" # we still want the default
+        # "  myNormalMCVSOutput = normalMC;\n", #but we add this
+        "  myNormalMCVSOutput = vec3(0.0, 1.0, 0.0);\n"
+        "  barfooVSOutput = barfoo;\n", #but we add this
+        False # only do it once
+    )
+    # now modify the fragment shader
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,  # in the fragment shader
+        "//VTK::Normal::Dec", # replace the normal block
+        True, # before the standard replacements
+        "//VTK::Normal::Dec\n" # we still want the default
+        "  varying vec3 myNormalMCVSOutput;\n"
+        "  in vec3 barfooVSOutput;\n", #but we add this
+        False # only do it once
+    )
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,  # in the fragment shader
+        "//VTK::Normal::Impl", # replace the normal block
+        True, # before the standard replacements
+        "//VTK::Normal::Impl\n" # we still want the default calc
+        "  diffuseColor = (abs(barfooVSOutput));\n", #but we add this
+        False # only do it once
+    )
+
+
+
+
+
+    # Color Scale with a lookup table
+    # if is_colormap:
+
+    #     if lookup_colormap is None:
+    #         lookup_colormap = colormap_lookup_table()
+
+    #     poly_mapper.SetLookupTable(lookup_colormap)
+    #     poly_mapper.UseLookupTableScalarRangeOn()
+    #     poly_mapper.Update()
+
+    # Set Actor
+    # if lod:
+    #     actor = vtk.vtkLODActor()
+    #     actor.SetNumberOfCloudPoints(lod_points)
+    #     actor.GetProperty().SetPointSize(lod_points_size)
+    # else:
+    #     actor = vtk.vtkActor()
+
+    actor = vtk.vtkActor()
+    actor.SetMapper(poly_mapper)
+    actor.GetProperty().SetLineWidth(linewidth)
+
+    # actor.GetProperty().SetEdgeVisibility(True)
+    # actor.GetProperty().SetEdgeColor(0.9, 0.9, 0.4)
+    # actor.GetProperty().SetLineWidth(6)
+    # actor.GetProperty().SetPointSize(12)
+    # actor.GetProperty().SetRenderLinesAsTubes(True)
+    # actor.GetProperty().SetRenderPointsAsSpheres(True)
+
+    return actor
+
+
 def scalar_bar(lookup_table=None, title=" "):
     """ Default scalar bar actor for a given colormap (colorbar)
 

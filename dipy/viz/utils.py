@@ -227,11 +227,20 @@ def lines_to_vtk_polydata(lines, colors=None):
 
     vtk_colors.SetName("Colors")
 
+    foobar = numpy_to_vtk_colors(
+                        np.tile(255 * np.asarray((0.0, 0.0, 1.0)), (nb_points, 1)))
+    foobar.SetName("foobar")
+
+    # print(foobar.GetTuple3(0))
+
     # Create the poly_data
     poly_data = vtk.vtkPolyData()
     poly_data.SetPoints(vtk_points)
     poly_data.SetLines(vtk_lines)
     poly_data.GetPointData().SetScalars(vtk_colors)
+
+    poly_data.GetPointData().SetVectors(foobar)
+
     return poly_data, is_colormap
 
 
