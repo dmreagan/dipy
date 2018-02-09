@@ -227,19 +227,172 @@ def lines_to_vtk_polydata(lines, colors=None):
 
     vtk_colors.SetName("Colors")
 
+    # Create the poly_data
+    poly_data = vtk.vtkPolyData()
+    poly_data.SetPoints(vtk_points)
+    poly_data.SetLines(vtk_lines)
+    poly_data.GetPointData().SetScalars(vtk_colors)
+    return poly_data, is_colormap
+
+
+def lines_to_vtk_polydata_halo(lines, colors=None):
+    """ Create a vtkPolyData with lines and colors
+
+    Parameters
+    ----------
+    lines : list
+        list of N curves represented as 2D ndarrays
+    colors : array (N, 3), list of arrays, tuple (3,), array (K,), None
+        If None then a standard orientation colormap is used for every line.
+        If one tuple of color is used. Then all streamlines will have the same
+        colour.
+        If an array (N, 3) is given, where N is equal to the number of lines.
+        Then every line is coloured with a different RGB color.
+        If a list of RGB arrays is given then every point of every line takes
+        a different color.
+        If an array (K, 3) is given, where K is the number of points of all
+        lines then every point is colored with a different RGB color.
+        If an array (K,) is given, where K is the number of points of all
+        lines then these are considered as the values to be used by the
+        colormap.
+        If an array (L,) is given, where L is the number of streamlines then
+        these are considered as the values to be used by the colormap per
+        streamline.
+        If an array (X, Y, Z) or (X, Y, Z, 3) is given then the values for the
+        colormap are interpolated automatically using trilinear interpolation.
+
+    Returns
+    -------
+    poly_data : vtkPolyData
+    is_colormap : bool, true if the input color array was a colormap
+    """
+    my_lines = lines
+
+    # Get the 3d points_array
+    points_array = np.vstack(lines)
+
+    nb_lines = len(lines)
+    nb_points = len(points_array)
+
+    lines_range = range(nb_lines)
+
+    # Get lines_array in vtk input format
+    lines_array = []
+    # Using np.intp (instead of int64), because of a bug in numpy:
+    # https://github.com/nipy/dipy/pull/789
+    # https://github.com/numpy/numpy/issues/4384
+    points_per_line = np.zeros([nb_lines], np.intp)
+    current_position = 0
+    for i in lines_range:
+        current_len = len(lines[i])
+        points_per_line[i] = current_len
+
+        end_position = current_position + current_len
+        lines_array += [current_len]
+        lines_array += range(current_position, end_position)
+        current_position = end_position
+
+    lines_array = np.array(lines_array)
+
+    # Set Points to vtk array format
+    vtk_points = numpy_to_vtk_points(points_array)
+
+    # Set Lines to vtk array format
+    # No idea whether this is also correct for triangle strips instead of
+    # lines, but I'm going with it for now
+    vtk_lines = vtk.vtkCellArray()
+    vtk_lines.GetData().DeepCopy(ns.numpy_to_vtk(lines_array))
+    vtk_lines.SetNumberOfCells(nb_lines)
+
+    is_colormap = False
+    # # Get colors_array (reformat to have colors for each points)
+    # #           - if/else tested and work in normal simple case
+    # if colors is None:  # set automatic rgb colors
+    #     cols_arr = line_colors(lines)
+    #     colors_mapper = np.repeat(lines_range, points_per_line, axis=0)
+    #     vtk_colors = numpy_to_vtk_colors(255 * cols_arr[colors_mapper])
+    # else:
+    #     cols_arr = np.asarray(colors)
+    #     if cols_arr.dtype == np.object:  # colors is a list of colors
+    #         vtk_colors = numpy_to_vtk_colors(255 * np.vstack(colors))
+    #     else:
+    #         if len(cols_arr) == nb_points:
+    #             if cols_arr.ndim == 1:  # values for every point
+    #                 vtk_colors = ns.numpy_to_vtk(cols_arr, deep=True)
+    #                 is_colormap = True
+    #             elif cols_arr.ndim == 2:  # map color to each point
+    #                 vtk_colors = numpy_to_vtk_colors(255 * cols_arr)
+
+    #         elif cols_arr.ndim == 1:
+    #             if len(cols_arr) == nb_lines:  # values for every streamline
+    #                 cols_arrx = []
+    #                 for (i, value) in enumerate(colors):
+    #                     cols_arrx += lines[i].shape[0]*[value]
+    #                 cols_arrx = np.array(cols_arrx)
+    #                 vtk_colors = ns.numpy_to_vtk(cols_arrx, deep=True)
+    #                 is_colormap = True
+    #             else:  # the same colors for all points
+    #                 vtk_colors = numpy_to_vtk_colors(
+    #                     np.tile(255 * cols_arr, (nb_points, 1)))
+
+    #         elif cols_arr.ndim == 2:  # map color to each line
+    #             colors_mapper = np.repeat(lines_range, points_per_line, axis=0)
+    #             vtk_colors = numpy_to_vtk_colors(255 * cols_arr[colors_mapper])
+    #         else:  # colormap
+    #             #  get colors for each vertex
+    #             cols_arr = map_coordinates_3d_4d(cols_arr, points_array)
+    #             vtk_colors = ns.numpy_to_vtk(cols_arr, deep=True)
+    #             is_colormap = True
+
+    # vtk_colors.SetName("barf")
+
     foobar = numpy_to_vtk_colors(
-                        np.tile(255 * np.asarray((0.0, 0.0, 1.0)), (nb_points, 1)))
+        np.tile(255 * np.asarray((0.0, 1.0, 0.0)), (nb_points, 1)))
     foobar.SetName("foobar")
+
+    dir_current = None
+    dir_next = None
+    vertex_position = []
+    vertex_dir_to_next = []
+    vertex_uv = []
+
+    for i in range(len(points_array)):
+        vertex_position.append(points_array[i])
+
+        if (i == 0):  # first element
+            dir_current = points_array[i] - points_array[i]  # origin
+            dir_next = points_array[i + 1] - points_array[i]
+        elif (i == len(points_array) - 1):
+            dir_current = points_array[i] - points_array[i - 1]
+            dir_next = points_array[i] - points_array[i]  # origin
+        else:
+            dir_current = points_array[i] - points_array[i - 1]
+            dir_next = points_array[i + 1] - points_array[i]
+
+        vertex_dir_to_next.append(dir_current + dir_next)
+
+        vertex_uv.append([float(i) / (len(points_array) - 1), 0])
+    
+    vertex_position_vtk = numpy_to_vtk_colors(vertex_position)
+    vertex_dir_to_next_vtk = numpy_to_vtk_colors(vertex_dir_to_next)
+    vertex_uv_vtk = numpy_to_vtk_colors(vertex_uv)
+
+    vertex_position_vtk.SetName("pos")
+    vertex_dir_to_next_vtk.SetName("directionToNext")
+    vertex_uv_vtk.SetName("uv")
 
     # print(foobar.GetTuple3(0))
 
     # Create the poly_data
     poly_data = vtk.vtkPolyData()
     poly_data.SetPoints(vtk_points)
-    poly_data.SetLines(vtk_lines)
-    poly_data.GetPointData().SetScalars(vtk_colors)
-
-    poly_data.GetPointData().SetVectors(foobar)
+    # poly_data.SetLines(vtk_lines)
+    poly_data.SetStrips(vtk_lines)  # renders strangely, but go with it for now
+    # poly_data.GetPointData().SetScalars(vtk_colors)
+    # poly_data.GetPointData().SetVectors(foobar)
+    poly_data.GetPointData().SetScalars(vertex_position_vtk)
+    poly_data.GetPointData().SetVectors(vertex_dir_to_next_vtk)
+    poly_data.GetPointData().SetTCoords(vertex_uv_vtk)
 
     return poly_data, is_colormap
 

@@ -4,7 +4,7 @@ import numpy as np
 from nibabel.affines import apply_affine
 
 from dipy.viz.colormap import colormap_lookup_table, create_colormap
-from dipy.viz.utils import lines_to_vtk_polydata
+from dipy.viz.utils import lines_to_vtk_polydata, lines_to_vtk_polydata_halo
 from dipy.viz.utils import set_input
 
 # Conditional import machinery for vtk
@@ -643,7 +643,7 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
     >>> #window.show(ren)
     """
     # Poly data with lines and colors
-    poly_data, is_colormap = lines_to_vtk_polydata(lines, colors)
+    poly_data, is_colormap = lines_to_vtk_polydata_halo(lines, colors)
     next_input = poly_data
 
     # use spline interpolation
@@ -660,11 +660,31 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
     # poly_mapper.SelectColorArray("Colors")
     poly_mapper.Update()
 
-    # print(next_input.GetPointData())
+    # print(next_input.GetPointData().GetVectors().GetName())
+    print(poly_mapper.GetInput().GetPointData().GetScalars().GetTuple(200000))
+    print(poly_mapper.GetInput().GetPointData().GetVectors().GetTuple(200000))
+    print(poly_mapper.GetInput().GetPointData().GetTCoords().GetTuple(200000))
 
-    poly_mapper.MapDataArrayToVertexAttribute("barfoo", "foobar", vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, -1)
-
-
+    # poly_mapper.MapDataArrayToVertexAttribute("barfoo",
+    #                                           "foobar",
+    #                                           vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
+    #                                           -1)
+    # poly_mapper.MapDataArrayToVertexAttribute("barfoo",
+    #                                           poly_mapper.GetInput().GetPointData().GetVectors().GetName(), 
+    #                                           vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, 
+    #                                           -1)
+    poly_mapper.MapDataArrayToVertexAttribute("position",
+                                              poly_mapper.GetInput().GetPointData().GetScalars().GetName(),
+                                              vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
+                                              -1)
+    poly_mapper.MapDataArrayToVertexAttribute("direction",
+                                              poly_mapper.GetInput().GetPointData().GetVectors().GetName(),
+                                              vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
+                                              -1)
+    poly_mapper.MapDataArrayToVertexAttribute("uv",
+                                              poly_mapper.GetInput().GetPointData().GetTCoords().GetName(),
+                                              vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
+                                              -1)
 
     # Modify the shader to color based on model normal
     # To do this we have to modify the vertex shader
@@ -677,46 +697,55 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
     # shader
     poly_mapper.AddShaderReplacement(
         vtk.vtkShader.Vertex,
-        "//VTK::Normal::Dec", # replace the normal block
-        True, # before the standard replacements
-        "//VTK::Normal::Dec\n" # we still want the default
+        "//VTK::Normal::Dec",  # replace the normal block
+        True,  # before the standard replacements
+        "//VTK::Normal::Dec\n"  # we still want the default
         "  varying vec3 myNormalMCVSOutput;\n"
         "  in vec3 barfoo;\n"
-        "  out vec3 barfooVSOutput;\n", #but we add this
-        False # only do it once
+        "  in vec3 position;\n"
+        "  in vec3 direction;\n"
+        "  in vec2 uv;\n"
+        "  out vec3 positionVSOutput;\n"
+        "  out vec3 directionVSOutput;\n"
+        "  out vec2 uvVSOutput;\n"
+        "  out vec3 barfooVSOutput;\n",  # but we add this
+        False  # only do it once
     )
     poly_mapper.AddShaderReplacement(
         vtk.vtkShader.Vertex,
-        "//VTK::Normal::Impl", # replace the normal block
-        True, # before the standard replacements
-        "//VTK::Normal::Impl\n" # we still want the default
+        "//VTK::Normal::Impl",  # replace the normal block
+        True,  # before the standard replacements
+        "//VTK::Normal::Impl\n"  # we still want the default
         # "  myNormalMCVSOutput = normalMC;\n", #but we add this
         "  myNormalMCVSOutput = vec3(0.0, 1.0, 0.0);\n"
-        "  barfooVSOutput = barfoo;\n", #but we add this
-        False # only do it once
+        "  positionVSOutput = position;\n"
+        "  directionVSOutput = direction;\n"
+        "  uvVSOutput = uv;\n"
+        "  barfooVSOutput = barfoo;\n",  # but we add this
+        False  # only do it once
     )
     # now modify the fragment shader
     poly_mapper.AddShaderReplacement(
         vtk.vtkShader.Fragment,  # in the fragment shader
-        "//VTK::Normal::Dec", # replace the normal block
-        True, # before the standard replacements
-        "//VTK::Normal::Dec\n" # we still want the default
+        "//VTK::Normal::Dec",  # replace the normal block
+        True,  # before the standard replacements
+        "//VTK::Normal::Dec\n"  # we still want the default
         "  varying vec3 myNormalMCVSOutput;\n"
-        "  in vec3 barfooVSOutput;\n", #but we add this
-        False # only do it once
+        "  in vec3 positionVSOutput;\n"
+        "  in vec3 directionVSOutput;\n"
+        "  in vec2 uvVSOutput;\n"
+        "  in vec3 barfooVSOutput;\n",  # but we add this
+        False  # only do it once
     )
     poly_mapper.AddShaderReplacement(
         vtk.vtkShader.Fragment,  # in the fragment shader
-        "//VTK::Normal::Impl", # replace the normal block
-        True, # before the standard replacements
-        "//VTK::Normal::Impl\n" # we still want the default calc
-        "  diffuseColor = (abs(barfooVSOutput));\n", #but we add this
-        False # only do it once
+        "//VTK::Normal::Impl",  # replace the normal block
+        True,  # before the standard replacements
+        "//VTK::Normal::Impl\n"  # we still want the default calc
+        "  diffuseColor = normalize(positionVSOutput);\n",  # but we add this
+        # "  diffuseColor = (abs(barfooVSOutput));\n",  # but we add this
+        False  # only do it once
     )
-
-
-
-
 
     # Color Scale with a lookup table
     # if is_colormap:
