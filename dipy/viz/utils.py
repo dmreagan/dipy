@@ -88,6 +88,33 @@ def numpy_to_vtk_colors(colors):
     return vtk_colors
 
 
+def numpy_to_vtk_floats(colors):
+    """ Numpy color array to a vtk color array
+
+    Parameters
+    ----------
+    colors: ndarray
+
+    Returns
+    -------
+    vtk_colors : vtkDataArray
+
+    Notes
+    -----
+    If colors are not already in UNSIGNED_CHAR you may need to multiply by 255.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from dipy.viz.utils import numpy_to_vtk_colors
+    >>> rgb_array = np.random.rand(100, 3)
+    >>> vtk_colors = numpy_to_vtk_colors(255 * rgb_array)
+    """
+    vtk_colors = ns.numpy_to_vtk(np.asarray(colors), deep=True,
+                                 array_type=vtk.VTK_FLOAT)
+    return vtk_colors
+
+
 def map_coordinates_3d_4d(input_array, indices):
     """ Evaluate the input_array data at the given indices
     using trilinear interpolation
@@ -358,6 +385,7 @@ def lines_to_vtk_polydata_halo(lines, colors=None):
 
     for i in range(len(points_array)):
         vertex_position.append(points_array[i])
+        # vertex_position.append(np.array([11.62506104, 14.09339905, 9.61920929]))
 
         if (i == 0):  # first element
             dir_current = points_array[i] - points_array[i]  # origin
@@ -369,13 +397,29 @@ def lines_to_vtk_polydata_halo(lines, colors=None):
             dir_current = points_array[i] - points_array[i - 1]
             dir_next = points_array[i + 1] - points_array[i]
 
-        vertex_dir_to_next.append(dir_current + dir_next)
+        vertex_dir_to_next.append(np.array(dir_current + dir_next))
 
-        vertex_uv.append([float(i) / (len(points_array) - 1), 0])
-    
-    vertex_position_vtk = numpy_to_vtk_colors(vertex_position)
-    vertex_dir_to_next_vtk = numpy_to_vtk_colors(vertex_dir_to_next)
-    vertex_uv_vtk = numpy_to_vtk_colors(vertex_uv)
+        vertex_uv.append(np.array([float(i) / (len(points_array) - 1), 0]))
+
+    # does numpy_to_vtk_colors ignore digits after decimal?
+    vertex_position_vtk = numpy_to_vtk_floats(vertex_position)
+    vertex_dir_to_next_vtk = numpy_to_vtk_floats(vertex_dir_to_next)
+    vertex_uv_vtk = numpy_to_vtk_floats(vertex_uv)
+
+    print("\nnumpy")
+    print(vertex_position[200000])
+    print(vertex_dir_to_next[200000])
+    print(vertex_uv[200000])
+
+    print("\nvtk")
+    print(vertex_position_vtk.GetTuple(200000))
+    print(vertex_dir_to_next_vtk.GetTuple(200000))
+    print(vertex_uv_vtk.GetTuple(200000))
+
+    # print("\nvtk")
+    # print(vertex_position_vtk.GetPoint(200000))
+    # print(vertex_dir_to_next_vtk.GetPoint(200000))
+    # print(vertex_uv_vtk.GetPoint(200000))
 
     vertex_position_vtk.SetName("pos")
     vertex_dir_to_next_vtk.SetName("directionToNext")

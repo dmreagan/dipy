@@ -660,10 +660,10 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
     # poly_mapper.SelectColorArray("Colors")
     poly_mapper.Update()
 
-    # print(next_input.GetPointData().GetVectors().GetName())
-    print(poly_mapper.GetInput().GetPointData().GetScalars().GetTuple(200000))
-    print(poly_mapper.GetInput().GetPointData().GetVectors().GetTuple(200000))
-    print(poly_mapper.GetInput().GetPointData().GetTCoords().GetTuple(200000))
+    # print("\nfrom polymapper")
+    # print(poly_mapper.GetInput().GetPointData().GetScalars().GetTuple(200000))
+    # print(poly_mapper.GetInput().GetPointData().GetVectors().GetTuple(200000))
+    # print(poly_mapper.GetInput().GetPointData().GetTCoords().GetTuple(200000))
 
     # poly_mapper.MapDataArrayToVertexAttribute("barfoo",
     #                                           "foobar",
@@ -742,7 +742,7 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
         "//VTK::Normal::Impl",  # replace the normal block
         True,  # before the standard replacements
         "//VTK::Normal::Impl\n"  # we still want the default calc
-        "  diffuseColor = normalize(positionVSOutput);\n",  # but we add this
+        "  diffuseColor = abs(normalize(directionVSOutput));\n",  # but we add this
         # "  diffuseColor = (abs(barfooVSOutput));\n",  # but we add this
         False  # only do it once
     )
