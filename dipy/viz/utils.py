@@ -293,7 +293,34 @@ def lines_to_vtk_polydata_halo(lines, colors=None):
     poly_data : vtkPolyData
     is_colormap : bool, true if the input color array was a colormap
     """
-    my_lines = lines
+    lines_duplicated = []
+
+    for line in lines:
+        line_dup = []
+        for point in line:
+            line_dup.append(point)
+            line_dup.append(point)
+
+        lines_duplicated.append(np.array(line_dup))
+
+    lines = lines_duplicated
+
+    # lines = np.array(lines)
+    # print(lines)
+    # print(np.array(lines).shape)
+    # print(np.array(lines))
+    # print(lines[0])
+    # lines = np.repeat(lines, 2, axis=1)  # duplicate each point
+    # print(lines[0][0])
+    # print(lines[0][1])
+    # print(lines[0])
+    # print(type(lines))
+    # print(type(lines[0]))
+    # print(type(lines[0][0]))
+    # print(lines_duplicated[0])
+    # print(type(lines_duplicated))
+    # print(type(lines_duplicated[0]))
+    # print(type(lines_duplicated[0][0]))
 
     # Get the 3d points_array
     points_array = np.vstack(lines)
@@ -327,6 +354,7 @@ def lines_to_vtk_polydata_halo(lines, colors=None):
     # Set Lines to vtk array format
     # No idea whether this is also correct for triangle strips instead of
     # lines, but I'm going with it for now
+    # Perhaps it is better to construct vtkCellArray manually from points?
     vtk_lines = vtk.vtkCellArray()
     vtk_lines.GetData().DeepCopy(ns.numpy_to_vtk(lines_array))
     vtk_lines.SetNumberOfCells(nb_lines)
@@ -379,53 +407,83 @@ def lines_to_vtk_polydata_halo(lines, colors=None):
 
     dir_current = None
     dir_next = None
-    vertex_position = []
-    vertex_dir_to_next = []
-    vertex_uv = []
+    vertex_position = []  # position of point
+    vertex_dir_to_next = []  # direction to next point
+    vertex_uv = []  # 0 for first of pair, 1 for second
 
+    # # generate additional vertex data for each point
+    # for i in range(len(points_array)):
+    #     vertex_position.append(points_array[i])
+
+    #     if (i == 0):  # first element
+    #         dir_current = points_array[i] - points_array[i]  # origin
+    #         dir_next = points_array[i + 1] - points_array[i]
+    #     elif (i == len(points_array) - 1):
+    #         dir_current = points_array[i] - points_array[i - 1]
+    #         dir_next = points_array[i] - points_array[i]  # origin
+    #     else:
+    #         dir_current = points_array[i] - points_array[i - 1]
+    #         dir_next = points_array[i + 1] - points_array[i]
+
+    #     vertex_dir_to_next.append(np.array(dir_current + dir_next))
+
+    #     vertex_uv.append(np.array([float(i) / (len(points_array) - 1), 0]))
+
+    # print(points_array[0])
+    # print(points_array[1])
+    # print(len(points_array))
+    # print(vtk_points.GetNumberOfPoints())
+    # print(vtk_points.GetPoint(0))
+    # print(vtk_points.GetPoint(1))
+
+    # generate additional vertex data for each point
+    # remember that each point is duplicated
     for i in range(len(points_array)):
         vertex_position.append(points_array[i])
-        # vertex_position.append(np.array([11.62506104, 14.09339905, 9.61920929]))
 
-        if (i == 0):  # first element
+        if (i <= 1):  # first two elements
             dir_current = points_array[i] - points_array[i]  # origin
-            dir_next = points_array[i + 1] - points_array[i]
-        elif (i == len(points_array) - 1):
-            dir_current = points_array[i] - points_array[i - 1]
+            dir_next = points_array[i + 2] - points_array[i]
+        elif (i >= len(points_array) - 2):  # last two elements
+            dir_current = points_array[i] - points_array[i - 2]
             dir_next = points_array[i] - points_array[i]  # origin
         else:
-            dir_current = points_array[i] - points_array[i - 1]
-            dir_next = points_array[i + 1] - points_array[i]
+            dir_current = points_array[i] - points_array[i - 2]
+            dir_next = points_array[i + 2] - points_array[i]
 
         vertex_dir_to_next.append(np.array(dir_current + dir_next))
 
-        vertex_uv.append(np.array([float(i) / (len(points_array) - 1), 0]))
+        # u coordinate is interpolated along length of array
+        # v coordinate is 0 for first copy of point, 1 for second copy
+        # vertex_uv.append(np.array([float(i) / (len(points_array) - 1), i % 2]))
+        u = 0.0
+        v = 0.0
+        if (i % 2):
+            u = float(i - 1) / ((len(points_array) / 2) - 1)
+            v = 1.0
+        else:
+            u = float(i) / ((len(points_array) / 2) - 1)
+            v = 0.0
 
-    # does numpy_to_vtk_colors ignore digits after decimal?
+        vertex_uv.append(np.array([u, v]))
+
     vertex_position_vtk = numpy_to_vtk_floats(vertex_position)
     vertex_dir_to_next_vtk = numpy_to_vtk_floats(vertex_dir_to_next)
     vertex_uv_vtk = numpy_to_vtk_floats(vertex_uv)
 
-    print("\nnumpy")
-    print(vertex_position[200000])
-    print(vertex_dir_to_next[200000])
-    print(vertex_uv[200000])
+    # print("\nnumpy 0")
+    # print(vertex_position[0])
+    # print(vertex_dir_to_next[0])
+    # print(vertex_uv[0])
 
-    print("\nvtk")
-    print(vertex_position_vtk.GetTuple(200000))
-    print(vertex_dir_to_next_vtk.GetTuple(200000))
-    print(vertex_uv_vtk.GetTuple(200000))
-
-    # print("\nvtk")
-    # print(vertex_position_vtk.GetPoint(200000))
-    # print(vertex_dir_to_next_vtk.GetPoint(200000))
-    # print(vertex_uv_vtk.GetPoint(200000))
+    # print("\nvtk 2")
+    # print(vertex_position_vtk.GetTuple(2))
+    # print(vertex_dir_to_next_vtk.GetTuple(2))
+    # print(vertex_uv_vtk.GetTuple(2))
 
     vertex_position_vtk.SetName("pos")
     vertex_dir_to_next_vtk.SetName("directionToNext")
     vertex_uv_vtk.SetName("uv")
-
-    # print(foobar.GetTuple3(0))
 
     # Create the poly_data
     poly_data = vtk.vtkPolyData()
@@ -433,7 +491,6 @@ def lines_to_vtk_polydata_halo(lines, colors=None):
     # poly_data.SetLines(vtk_lines)
     poly_data.SetStrips(vtk_lines)  # renders strangely, but go with it for now
     # poly_data.GetPointData().SetScalars(vtk_colors)
-    # poly_data.GetPointData().SetVectors(foobar)
     poly_data.GetPointData().SetScalars(vertex_position_vtk)
     poly_data.GetPointData().SetVectors(vertex_dir_to_next_vtk)
     poly_data.GetPointData().SetTCoords(vertex_uv_vtk)

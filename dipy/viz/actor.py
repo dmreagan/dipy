@@ -665,14 +665,6 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
     # print(poly_mapper.GetInput().GetPointData().GetVectors().GetTuple(200000))
     # print(poly_mapper.GetInput().GetPointData().GetTCoords().GetTuple(200000))
 
-    # poly_mapper.MapDataArrayToVertexAttribute("barfoo",
-    #                                           "foobar",
-    #                                           vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
-    #                                           -1)
-    # poly_mapper.MapDataArrayToVertexAttribute("barfoo",
-    #                                           poly_mapper.GetInput().GetPointData().GetVectors().GetName(), 
-    #                                           vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, 
-    #                                           -1)
     poly_mapper.MapDataArrayToVertexAttribute("position",
                                               poly_mapper.GetInput().GetPointData().GetScalars().GetName(),
                                               vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
@@ -685,6 +677,8 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
                                               poly_mapper.GetInput().GetPointData().GetTCoords().GetName(),
                                               vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
                                               -1)
+
+    print(poly_mapper.GetVBOs())
 
     # Modify the shader to color based on model normal
     # To do this we have to modify the vertex shader
@@ -701,14 +695,18 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
         True,  # before the standard replacements
         "//VTK::Normal::Dec\n"  # we still want the default
         "  varying vec3 myNormalMCVSOutput;\n"
-        "  in vec3 barfoo;\n"
+        "  uniform mat4 viewMat;\n"
+        "  uniform mat4 projMat;\n"
+        "  uniform vec3 cameraPos;\n"
+        "  uniform float lineTriangleStripWidth;\n"
+        "  uniform vec3 clipPlaneNormal;\n"
+        "  uniform float clipPlaneDistance;\n"
         "  in vec3 position;\n"
         "  in vec3 direction;\n"
         "  in vec2 uv;\n"
         "  out vec3 positionVSOutput;\n"
         "  out vec3 directionVSOutput;\n"
-        "  out vec2 uvVSOutput;\n"
-        "  out vec3 barfooVSOutput;\n",  # but we add this
+        "  out vec2 uvVSOutput;\n",  # but we add this
         False  # only do it once
     )
     poly_mapper.AddShaderReplacement(
@@ -717,11 +715,11 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
         True,  # before the standard replacements
         "//VTK::Normal::Impl\n"  # we still want the default
         # "  myNormalMCVSOutput = normalMC;\n", #but we add this
-        "  myNormalMCVSOutput = vec3(0.0, 1.0, 0.0);\n"
+        "  vec3 viewAlignedPerpendicularDirection = normalize(cross(position - cameraPos, direction));\n"
+        "  vec3 viewAlignedPosition = position + viewAlignedPerpendicularDirection * (uv.y - 0.5) * lineTriangleStripWidth;"
         "  positionVSOutput = position;\n"
         "  directionVSOutput = direction;\n"
-        "  uvVSOutput = uv;\n"
-        "  barfooVSOutput = barfoo;\n",  # but we add this
+        "  uvVSOutput = uv;\n",  # but we add this
         False  # only do it once
     )
     # now modify the fragment shader
@@ -733,8 +731,7 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
         "  varying vec3 myNormalMCVSOutput;\n"
         "  in vec3 positionVSOutput;\n"
         "  in vec3 directionVSOutput;\n"
-        "  in vec2 uvVSOutput;\n"
-        "  in vec3 barfooVSOutput;\n",  # but we add this
+        "  in vec2 uvVSOutput;\n",  # but we add this
         False  # only do it once
     )
     poly_mapper.AddShaderReplacement(
@@ -743,7 +740,6 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
         True,  # before the standard replacements
         "//VTK::Normal::Impl\n"  # we still want the default calc
         "  diffuseColor = abs(normalize(directionVSOutput));\n",  # but we add this
-        # "  diffuseColor = (abs(barfooVSOutput));\n",  # but we add this
         False  # only do it once
     )
 
