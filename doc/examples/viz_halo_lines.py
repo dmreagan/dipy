@@ -52,7 +52,7 @@ This is the default option when you are using ``line`` or ``streamtube``.
 renderer = window.Renderer()
 renderer.background((1.0, 1.0, 1.0))
 
-stream_actor = actor.halo_line(bundle_native, colors=[1.0, 0.0, 0.0])
+stream_actor = actor.halo_line(bundle_native, colors=[1.0, 0.0, 0.0], renderer=renderer)
 
 renderer.set_camera(position=(-176.42, 118.52, 128.20),
                     focal_point=(113.30, 128.31, 76.56),

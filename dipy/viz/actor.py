@@ -583,7 +583,7 @@ def line(lines, colors=None, opacity=1, linewidth=1,
 
 def halo_line(lines, colors=None, opacity=1, linewidth=1,
               spline_subdiv=None, lod=True, lod_points=10 ** 4,
-              lod_points_size=3, lookup_colormap=None):
+              lod_points_size=3, lookup_colormap=None, renderer=None):
     """ Create an actor for one or more lines.
 
     Parameters
@@ -678,70 +678,151 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
                                               vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
                                               -1)
 
-    print(poly_mapper.GetVBOs())
+    # print(poly_mapper.GetVBOs())
 
-    # Modify the shader to color based on model normal
-    # To do this we have to modify the vertex shader
-    # to pass the normal in model coordinates
-    # through to the fragment shader. By default the normal
-    # is converted to View coordinates and then passed on.
-    # We keep that, but add a varying for the original normal.
-    # Then we modify the fragment shader to set the diffuse color
-    # based on that normal. First lets modify the vertex
-    # shader
+    # Texture coordinates
     poly_mapper.AddShaderReplacement(
         vtk.vtkShader.Vertex,
-        "//VTK::Normal::Dec",  # replace the normal block
+        "//VTK::TCoord::Dec",  # replace the normal block
         True,  # before the standard replacements
-        "//VTK::Normal::Dec\n"  # we still want the default
-        "  varying vec3 myNormalMCVSOutput;\n"
-        "  uniform mat4 viewMat;\n"
-        "  uniform mat4 projMat;\n"
-        "  uniform vec3 cameraPos;\n"
-        "  uniform float lineTriangleStripWidth;\n"
-        "  uniform vec3 clipPlaneNormal;\n"
-        "  uniform float clipPlaneDistance;\n"
-        "  in vec3 position;\n"
-        "  in vec3 direction;\n"
-        "  in vec2 uv;\n"
-        "  out vec3 positionVSOutput;\n"
-        "  out vec3 directionVSOutput;\n"
-        "  out vec2 uvVSOutput;\n",  # but we add this
+        "//VTK::TCoord::Dec\n"  # we still want the default
+        "in vec2 uv;\n"
+        "out vec2 uvVSOutput;\n",  # but we add this
         False  # only do it once
     )
     poly_mapper.AddShaderReplacement(
         vtk.vtkShader.Vertex,
-        "//VTK::Normal::Impl",  # replace the normal block
+        "//VTK::TCoord::Impl",  # replace the normal block
         True,  # before the standard replacements
-        "//VTK::Normal::Impl\n"  # we still want the default
-        # "  myNormalMCVSOutput = normalMC;\n", #but we add this
-        "  vec3 viewAlignedPerpendicularDirection = normalize(cross(position - cameraPos, direction));\n"
-        "  vec3 viewAlignedPosition = position + viewAlignedPerpendicularDirection * (uv.y - 0.5) * lineTriangleStripWidth;"
-        "  positionVSOutput = position;\n"
-        "  directionVSOutput = direction;\n"
-        "  uvVSOutput = uv;\n",  # but we add this
+        "//VTK::TCoord::Impl\n"  # we still want the default
+        "uvVSOutput = uv;\n",  # but we add this
         False  # only do it once
     )
+
+    # camera and actor matrix values
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::Camera::Dec",  # replace the normal block
+        True,  # before the standard replacements
+        "//VTK::Camera::Dec\n"  # we still want the default
+        "uniform mat4 viewMat;\n"
+        "uniform mat4 projMat;\n"
+        "uniform vec3 cameraPos;\n",  # but we add this
+        False  # only do it once
+    )
+
+    # vertex position
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::ValuePass::Dec",  # replace the normal block
+        True,  # before the standard replacements
+        "//VTK::ValuePass::Dec\n"  # we still want the default
+        "uniform float lineTriangleStripWidth;\n"
+        "in vec3 position;\n"
+        "in vec3 direction;\n"
+        "out vec3 positionVSOutput;\n"
+        "out vec3 directionVSOutput;\n",  # but we add this
+        False  # only do it once
+    )
+    poly_mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::ValuePass::Impl",  # replace the normal block
+        True,  # before the standard replacements
+        "//VTK::ValuePass::Impl\n"  # we still want the default
+        "vec3 viewAlignedPerpendicularDirection = normalize(cross(position - cameraPos, direction));\n"
+        "vec3 viewAlignedPosition = position + viewAlignedPerpendicularDirection * (uv.y - 0.5) * lineTriangleStripWidth;\n"
+        "positionVSOutput = position;\n"
+        "directionVSOutput = direction;\n"
+        "gl_Position = MCDCMatrix * vec4(viewAlignedPosition, 1.0);\n",  # but we add this
+        # "gl_Position = projMat * viewMat * vec4(viewAlignedPosition, 1.0);\n",  # but we add this
+        # "gl_Position = MCDCMatrix * vertexMC;\n",  # but we add this
+        False  # only do it once
+    )
+
     # now modify the fragment shader
+    # poly_mapper.AddShaderReplacement(
+    #     vtk.vtkShader.Fragment,  # in the fragment shader
+    #     "//VTK::Normal::Dec",  # replace the normal block
+    #     True,  # before the standard replacements
+    #     "//VTK::Normal::Dec\n"  # we still want the default
+    #     # "  uniform vec3 mycolor;\n"
+    #     # "  uniform vec3 cameraPos;\n"
+    #     "  in vec3 positionVSOutput;\n"
+    #     "  in vec3 directionVSOutput;\n"
+    #     "  in vec2 uvVSOutput;\n",  # but we add this
+    #     False  # only do it once
+    # )
+    # poly_mapper.AddShaderReplacement(
+    #     vtk.vtkShader.Fragment,  # in the fragment shader
+    #     "//VTK::Normal::Impl",  # replace the normal block
+    #     True,  # before the standard replacements
+    #     "//VTK::Normal::Impl\n"  # we still want the default calc
+    #     # "  diffuseColor = abs(normalize(positionVSOutput));\n",  # but we add this
+    #     "  diffuseColor = uv;\n",  # but we add this
+    #     False  # only do it once
+    # )
+
     poly_mapper.AddShaderReplacement(
         vtk.vtkShader.Fragment,  # in the fragment shader
-        "//VTK::Normal::Dec",  # replace the normal block
+        "//VTK::Coincident::Dec",  # replace the normal block
         True,  # before the standard replacements
-        "//VTK::Normal::Dec\n"  # we still want the default
-        "  varying vec3 myNormalMCVSOutput;\n"
-        "  in vec3 positionVSOutput;\n"
-        "  in vec3 directionVSOutput;\n"
-        "  in vec2 uvVSOutput;\n",  # but we add this
+        "//VTK::Coincident::Dec\n"  # we still want the default
+        # "  uniform vec3 mycolor;\n"
+        # "  uniform vec3 cameraPos;\n"
+        "uniform float lineWidthPercentageBlack;\n"
+        "uniform float lineWidthDepthCueingFactor;\n"
+        "uniform float lineHaloMaxDepth;\n"
+        "uniform vec3 colorLine;\n"
+        "uniform vec3 colorHalo;\n"
+        "in vec3 positionVSOutput;\n"
+        "in vec3 directionVSOutput;\n"
+        "in vec2 uvVSOutput;\n",  # but we add this
         False  # only do it once
     )
     poly_mapper.AddShaderReplacement(
         vtk.vtkShader.Fragment,  # in the fragment shader
-        "//VTK::Normal::Impl",  # replace the normal block
+        "//VTK::Coincident::Impl",  # replace the normal block
         True,  # before the standard replacements
-        "//VTK::Normal::Impl\n"  # we still want the default calc
-        "  diffuseColor = abs(normalize(directionVSOutput));\n",  # but we add this
+        "//VTK::Coincident::Impl\n"  # we still want the default calc
+        "float offset = 2 * abs(uvVSOutput.y - 0.5);\n"
+        "float depth = gl_FragCoord.z;\n"
+        "float offsetThreshold = lineWidthPercentageBlack * (1 - depth * lineWidthDepthCueingFactor);\n"
+        "if (offset < offsetThreshold) {\n"
+        "  fragOutput0 = vec4(colorLine, 1);\n"
+        # "  fragOutput0 = vec4(0.0, 0.0, 1.0, 0.5);\n"
+        "  gl_FragDepth = depth;\n"
+        "} else {\n" # right now all frags come through else
+        "  fragOutput0 = vec4(colorHalo, 1);\n"
+        # "  fragOutput0 = vec4(1.0, 0.0, 0.0, 0.5);\n"
+        "  gl_FragDepth = depth + offset * lineHaloMaxDepth;\n"
+        "}\n",
+        # "diffuseColor = abs(normalize(positionVSOutput));\n",  # but we add this
+        # "fragOutput0 = vec4(abs(normalize(positionVSOutput)), 0.5);\n",  # but we add this
         False  # only do it once
     )
+
+    @vtk.calldata_type(vtk.VTK_OBJECT)
+    def vtkShaderCallback(caller, event, calldata=None):
+        camera = renderer.GetActiveCamera()
+        cameraPos = camera.GetPosition()
+        projMat = camera.GetProjectionTransformMatrix(renderer)
+        viewMat = camera.GetViewTransformMatrix()
+        program = calldata
+        if program is not None:
+            program.SetUniformf("lineTriangleStripWidth", 0.03)
+            program.SetUniformf("lineWidthPercentageBlack", 0.3)
+            program.SetUniformf("lineWidthDepthCueingFactor", 1.0)
+            program.SetUniformf("lineHaloMaxDepth", 0.02)
+            program.SetUniform3f("colorLine", [0.0, 0.0, 0.0])
+            # program.SetUniform3f("colorHalo", [1.0, 1.0, 1.0])
+            program.SetUniform3f("colorHalo", [0.0, 0.0, 1.0])
+            program.SetUniform3f("mycolor", [0.4, 0.7, 0.6])
+            program.SetUniform3f("cameraPos", cameraPos)
+            program.SetUniformMatrix("projMat", projMat)
+            program.SetUniformMatrix("viewMat", viewMat)
+
+    poly_mapper.AddObserver(vtk.vtkCommand.UpdateShaderEvent,
+                            vtkShaderCallback)
 
     # Color Scale with a lookup table
     # if is_colormap:

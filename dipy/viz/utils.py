@@ -303,24 +303,7 @@ def lines_to_vtk_polydata_halo(lines, colors=None):
 
         lines_duplicated.append(np.array(line_dup))
 
-    lines = lines_duplicated
-
-    # lines = np.array(lines)
-    # print(lines)
-    # print(np.array(lines).shape)
-    # print(np.array(lines))
-    # print(lines[0])
-    # lines = np.repeat(lines, 2, axis=1)  # duplicate each point
-    # print(lines[0][0])
-    # print(lines[0][1])
-    # print(lines[0])
-    # print(type(lines))
-    # print(type(lines[0]))
-    # print(type(lines[0][0]))
-    # print(lines_duplicated[0])
-    # print(type(lines_duplicated))
-    # print(type(lines_duplicated[0]))
-    # print(type(lines_duplicated[0][0]))
+    # lines = lines_duplicated
 
     # Get the 3d points_array
     points_array = np.vstack(lines)
@@ -399,8 +382,6 @@ def lines_to_vtk_polydata_halo(lines, colors=None):
     #             vtk_colors = ns.numpy_to_vtk(cols_arr, deep=True)
     #             is_colormap = True
 
-    # vtk_colors.SetName("barf")
-
     foobar = numpy_to_vtk_colors(
         np.tile(255 * np.asarray((0.0, 1.0, 0.0)), (nb_points, 1)))
     foobar.SetName("foobar")
@@ -411,61 +392,54 @@ def lines_to_vtk_polydata_halo(lines, colors=None):
     vertex_dir_to_next = []  # direction to next point
     vertex_uv = []  # 0 for first of pair, 1 for second
 
-    # # generate additional vertex data for each point
-    # for i in range(len(points_array)):
-    #     vertex_position.append(points_array[i])
-
-    #     if (i == 0):  # first element
-    #         dir_current = points_array[i] - points_array[i]  # origin
-    #         dir_next = points_array[i + 1] - points_array[i]
-    #     elif (i == len(points_array) - 1):
-    #         dir_current = points_array[i] - points_array[i - 1]
-    #         dir_next = points_array[i] - points_array[i]  # origin
-    #     else:
-    #         dir_current = points_array[i] - points_array[i - 1]
-    #         dir_next = points_array[i + 1] - points_array[i]
-
-    #     vertex_dir_to_next.append(np.array(dir_current + dir_next))
-
-    #     vertex_uv.append(np.array([float(i) / (len(points_array) - 1), 0]))
-
-    # print(points_array[0])
-    # print(points_array[1])
-    # print(len(points_array))
-    # print(vtk_points.GetNumberOfPoints())
-    # print(vtk_points.GetPoint(0))
-    # print(vtk_points.GetPoint(1))
-
     # generate additional vertex data for each point
-    # remember that each point is duplicated
     for i in range(len(points_array)):
         vertex_position.append(points_array[i])
 
-        if (i <= 1):  # first two elements
+        if (i == 0):  # first element
             dir_current = points_array[i] - points_array[i]  # origin
-            dir_next = points_array[i + 2] - points_array[i]
-        elif (i >= len(points_array) - 2):  # last two elements
-            dir_current = points_array[i] - points_array[i - 2]
+            dir_next = points_array[i + 1] - points_array[i]
+        elif (i == len(points_array) - 1):
+            dir_current = points_array[i] - points_array[i - 1]
             dir_next = points_array[i] - points_array[i]  # origin
         else:
-            dir_current = points_array[i] - points_array[i - 2]
-            dir_next = points_array[i + 2] - points_array[i]
+            dir_current = points_array[i] - points_array[i - 1]
+            dir_next = points_array[i + 1] - points_array[i]
 
         vertex_dir_to_next.append(np.array(dir_current + dir_next))
 
-        # u coordinate is interpolated along length of array
-        # v coordinate is 0 for first copy of point, 1 for second copy
-        # vertex_uv.append(np.array([float(i) / (len(points_array) - 1), i % 2]))
-        u = 0.0
-        v = 0.0
-        if (i % 2):
-            u = float(i - 1) / ((len(points_array) / 2) - 1)
-            v = 1.0
-        else:
-            u = float(i) / ((len(points_array) / 2) - 1)
-            v = 0.0
+        vertex_uv.append(np.array([float(i) / (len(points_array) - 1), 0]))
 
-        vertex_uv.append(np.array([u, v]))
+    # # generate additional vertex data for each point
+    # # remember that each point is duplicated
+    # for i in range(len(points_array)):
+    #     vertex_position.append(points_array[i])
+
+    #     if (i <= 1):  # first two elements
+    #         dir_current = points_array[i] - points_array[i]  # origin
+    #         dir_next = points_array[i + 2] - points_array[i]
+    #     elif (i >= len(points_array) - 2):  # last two elements
+    #         dir_current = points_array[i] - points_array[i - 2]
+    #         dir_next = points_array[i] - points_array[i]  # origin
+    #     else:
+    #         dir_current = points_array[i] - points_array[i - 2]
+    #         dir_next = points_array[i + 2] - points_array[i]
+
+    #     vertex_dir_to_next.append(np.array(dir_current + dir_next))
+
+    #     # u coordinate is interpolated along length of array
+    #     # v coordinate is 0 for first copy of point, 1 for second copy
+    #     # vertex_uv.append(np.array([float(i) / (len(points_array) - 1), i % 2]))
+    #     u = 0.0
+    #     v = 0.0
+    #     if (i % 2):
+    #         u = float(i - 1) / ((len(points_array) / 2) - 1)
+    #         v = 1.0
+    #     else:
+    #         u = float(i) / ((len(points_array) / 2) - 1)
+    #         v = 0.0
+
+    #     vertex_uv.append(np.array([u, v]))
 
     vertex_position_vtk = numpy_to_vtk_floats(vertex_position)
     vertex_dir_to_next_vtk = numpy_to_vtk_floats(vertex_dir_to_next)
