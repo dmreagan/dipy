@@ -740,28 +740,7 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
     )
 
     # now modify the fragment shader
-    # poly_mapper.AddShaderReplacement(
-    #     vtk.vtkShader.Fragment,  # in the fragment shader
-    #     "//VTK::Normal::Dec",  # replace the normal block
-    #     True,  # before the standard replacements
-    #     "//VTK::Normal::Dec\n"  # we still want the default
-    #     # "  uniform vec3 mycolor;\n"
-    #     # "  uniform vec3 cameraPos;\n"
-    #     "  in vec3 positionVSOutput;\n"
-    #     "  in vec3 directionVSOutput;\n"
-    #     "  in vec2 uvVSOutput;\n",  # but we add this
-    #     False  # only do it once
-    # )
-    # poly_mapper.AddShaderReplacement(
-    #     vtk.vtkShader.Fragment,  # in the fragment shader
-    #     "//VTK::Normal::Impl",  # replace the normal block
-    #     True,  # before the standard replacements
-    #     "//VTK::Normal::Impl\n"  # we still want the default calc
-    #     # "  diffuseColor = abs(normalize(positionVSOutput));\n",  # but we add this
-    #     "  diffuseColor = uv;\n",  # but we add this
-    #     False  # only do it once
-    # )
-
+    # VTK::Coincident seemed to be the best way to overwrite fragOutput0
     poly_mapper.AddShaderReplacement(
         vtk.vtkShader.Fragment,  # in the fragment shader
         "//VTK::Coincident::Dec",  # replace the normal block
@@ -784,20 +763,21 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
         "//VTK::Coincident::Impl",  # replace the normal block
         True,  # before the standard replacements
         "//VTK::Coincident::Impl\n"  # we still want the default calc
-        "float offset = 2 * abs(uvVSOutput.y - 0.5);\n"
-        "float depth = gl_FragCoord.z;\n"
-        "float offsetThreshold = lineWidthPercentageBlack * (1 - depth * lineWidthDepthCueingFactor);\n"
-        "if (offset < offsetThreshold) {\n"
-        "  fragOutput0 = vec4(colorLine, 1);\n"
-        # "  fragOutput0 = vec4(0.0, 0.0, 1.0, 0.5);\n"
-        "  gl_FragDepth = depth;\n"
-        "} else {\n" # right now all frags come through else
-        "  fragOutput0 = vec4(colorHalo, 1);\n"
-        # "  fragOutput0 = vec4(1.0, 0.0, 0.0, 0.5);\n"
-        "  gl_FragDepth = depth + offset * lineHaloMaxDepth;\n"
-        "}\n",
+        # "float offset = 2 * abs(uvVSOutput.y - 0.5);\n"
+        # "float depth = gl_FragCoord.z;\n"
+        # "float offsetThreshold = lineWidthPercentageBlack * (1 - depth * lineWidthDepthCueingFactor);\n"
+        # "if (offset < offsetThreshold) {\n"
+        # "  fragOutput0 = vec4(colorLine, 1);\n"
+        # # "  fragOutput0 = vec4(0.0, 0.0, 1.0, 0.5);\n"
+        # "  gl_FragDepth = depth;\n"
+        # "} else {\n" # right now all frags come through else
+        # "  fragOutput0 = vec4(0, uvVSOutput.y, 0, 1);\n"
+        # # "  fragOutput0 = vec4(1.0, 0.0, 0.0, 0.5);\n"
+        # "  gl_FragDepth = depth + offset * lineHaloMaxDepth;\n"
+        # "}\n",
         # "diffuseColor = abs(normalize(positionVSOutput));\n",  # but we add this
-        # "fragOutput0 = vec4(abs(normalize(positionVSOutput)), 0.5);\n",  # but we add this
+        "fragOutput0 = vec4(abs(normalize(positionVSOutput)), 0.5);\n",  # but we add this
+        # "fragOutput0 = vec4(0, 0, 0, 0.5);\n",  # but we add this
         False  # only do it once
     )
 
