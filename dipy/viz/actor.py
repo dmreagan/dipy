@@ -763,20 +763,18 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
         "//VTK::Coincident::Impl",  # replace the normal block
         True,  # before the standard replacements
         "//VTK::Coincident::Impl\n"  # we still want the default calc
-        # "float offset = 2 * abs(uvVSOutput.y - 0.5);\n"
-        # "float depth = gl_FragCoord.z;\n"
-        # "float offsetThreshold = lineWidthPercentageBlack * (1 - depth * lineWidthDepthCueingFactor);\n"
-        # "if (offset < offsetThreshold) {\n"
-        # "  fragOutput0 = vec4(colorLine, 1);\n"
-        # # "  fragOutput0 = vec4(0.0, 0.0, 1.0, 0.5);\n"
-        # "  gl_FragDepth = depth;\n"
-        # "} else {\n" # right now all frags come through else
-        # "  fragOutput0 = vec4(0, uvVSOutput.y, 0, 1);\n"
-        # # "  fragOutput0 = vec4(1.0, 0.0, 0.0, 0.5);\n"
-        # "  gl_FragDepth = depth + offset * lineHaloMaxDepth;\n"
-        # "}\n",
+        "float offset = 2 * abs(uvVSOutput.y - 0.5);\n"
+        "float depth = gl_FragCoord.z;\n"
+        "float offsetThreshold = lineWidthPercentageBlack * (1 - depth * lineWidthDepthCueingFactor);\n"
+        "if (offset < offsetThreshold) {\n"
+        "  fragOutput0 = vec4(colorLine, 1);\n"
+        "  gl_FragDepth = depth;\n"
+        "} else {\n" # right now all frags come through else
+        "  fragOutput0 = vec4(colorHalo, 1);\n"
+        "  gl_FragDepth = depth + offset * lineHaloMaxDepth;\n"
+        "}\n",
         # "diffuseColor = abs(normalize(positionVSOutput));\n",  # but we add this
-        "fragOutput0 = vec4(abs(normalize(positionVSOutput)), 0.5);\n",  # but we add this
+        # "fragOutput0 = vec4(abs(normalize(positionVSOutput)), 0.5);\n",  # but we add this
         # "fragOutput0 = vec4(0, 0, 0, 0.5);\n",  # but we add this
         False  # only do it once
     )
@@ -789,13 +787,17 @@ def halo_line(lines, colors=None, opacity=1, linewidth=1,
         viewMat = camera.GetViewTransformMatrix()
         program = calldata
         if program is not None:
-            program.SetUniformf("lineTriangleStripWidth", 0.03)
-            program.SetUniformf("lineWidthPercentageBlack", 0.3)
-            program.SetUniformf("lineWidthDepthCueingFactor", 1.0)
-            program.SetUniformf("lineHaloMaxDepth", 0.02)
+            program.SetUniformf("lineTriangleStripWidth", 0.25)
+            program.SetUniformf("lineWidthPercentageBlack", 0.5)
+            program.SetUniformf("lineWidthDepthCueingFactor", 0.5)
+            program.SetUniformf("lineHaloMaxDepth", 0.005)
+            # program.SetUniformf("lineTriangleStripWidth", 0.05)
+            # program.SetUniformf("lineWidthPercentageBlack", 0.3)
+            # program.SetUniformf("lineWidthDepthCueingFactor", 1.0)
+            # program.SetUniformf("lineHaloMaxDepth", 0.02)
             program.SetUniform3f("colorLine", [0.0, 0.0, 0.0])
-            # program.SetUniform3f("colorHalo", [1.0, 1.0, 1.0])
-            program.SetUniform3f("colorHalo", [0.0, 0.0, 1.0])
+            program.SetUniform3f("colorHalo", [1.0, 1.0, 1.0])
+            # program.SetUniform3f("colorHalo", [0.8, 0.8, 0.8])
             program.SetUniform3f("mycolor", [0.4, 0.7, 0.6])
             program.SetUniform3f("cameraPos", cameraPos)
             program.SetUniformMatrix("projMat", projMat)
