@@ -6,14 +6,14 @@ from dipy.tracking.streamline import (set_number_of_points,
                                       select_random_set_of_streamlines,
                                       unlist_streamlines,
                                       transform_streamlines)
-from dipy.viz import actor, window, utils, fvtk
+from dipy.viz import actor, window, utils, fvtk, ui
 from dipy.data.fetcher import fetch_bundles_2_subjects, read_bundles_2_subjects
 import numpy as np
 from dipy.core.geometry import rodrigues_axis_rotation
 # from dipy.segment.clustering import QuickBundles, QuickBundlesOnline
-from dipy.segment.clustering import QuickBundles  # should be able to get clusters from returned ClusterMap
-# from dipy.viz.colormap import distinguishable_colormap
-from dipy.viz.colormap import create_colormap  # use matplotlib Set3 for 12 qualitative colors
+from dipy.segment.clustering import QuickBundles  # should be able to get clusters from returned ClusterMap?
+from dipy.viz.colormap import distinguishable_colormap
+# from dipy.viz.colormap import create_colormap  # use matplotlib Set3 for 12 qualitative colors
 import vtk
 import nibabel as nib
 
@@ -81,6 +81,12 @@ qb = QuickBundles(threshold=qb_threshold)
 clusters = qb.cluster(streamlines)
 # This will be use to display individual cluster on the right panel.
 clusters_as_array_sequence = [nib.streamlines.ArraySequence(c) for c in clusters]
+# print(len(clusters))
+
+streamline_idx_to_cluster_idx = np.empty(len(streamlines), dtype=int)
+for i, cluster in enumerate(clusters):
+    for j in cluster.indices:
+        streamline_idx_to_cluster_idx[j] = i
 
 colormap = list(itertools.islice(distinguishable_colormap(bg=bg, exclude=[(0, 0, 0)]), len(clusters)))
 lut = create_colors_lookup_table(colormap)
@@ -120,8 +126,8 @@ ren_brain.background(bg)
 ren_brain.SetViewport(0, 0, 0.349, 1)
 ren_brain.add(brain_actor)
 ren_brain.add(clustered_brain_actor)
-ren_brain.reset_camera_tight()
-# print(ren_brain.GetLights())
+# ren_brain.reset_camera_tight()
+ren_brain.ResetCamera()
 
 # Middle renderer that contains the centroids.
 ren_centroids = window.Renderer()
@@ -131,12 +137,12 @@ ren_centroids.background(bg)
 ren_centroids.SetViewport(0.35, 0, 0.699, 1)
 # ren_centroids.add(centroids_actor)
 ren_centroids.SetActiveCamera(ren_brain.GetActiveCamera())  # Sync camera with the left one.
-print(ren_centroids.GetLights())
-print(ren_centroids.GetAmbient())
+# print(ren_centroids.GetLights())
+# print(ren_centroids.GetAmbient())
 light = ren_centroids.MakeLight()
 light.SetLightTypeToHeadlight()
 ren_centroids.AddLight(light)
-print(ren_centroids.GetLights())
+# print(ren_centroids.GetLights())
 
 # Right renderers: one per cluster (only for the 3*4 biggest).
 grid_dim = (3, 4)
@@ -169,29 +175,47 @@ for y in range(grid_dim[1])[::-1]:
 
 
 # Add captions
-text_picking = actor.text_overlay('Next streamline',
-                                  position=(ren_brain.size()[0]//2, 25),
-                                  color=(0, 0, 0),
-                                  font_size=34,
-                                  justification='center',
-                                  bold=True)
+# text_picking = actor.text_overlay('Next streamline',
+#                                   position=(ren_brain.size()[0]//2, 25),
+#                                   color=(0, 0, 0),
+#                                   font_size=34,
+#                                   justification='center',
+#                                   bold=True)
+text_picking = ui.TextBlock2D('Next streamline',
+                              position=(ren_brain.size()[0]//2, 25),
+                              color=(0, 0, 0),
+                              font_size=34,
+                              justification='center',
+                              bold=True)
 ren_main.add(text_picking)
 
-text_updating = actor.text_overlay('Centroids ',
-                                   position=(ren_brain.size()[0]+ren_centroids.size()[0]//2, 25),
-                                   color=(0, 0, 0),
-                                   font_size=34,
-                                   justification='center',
-                                   bold=True)
+# text_updating = actor.text_overlay('Centroids ',
+#                                    position=(ren_brain.size()[0]+ren_centroids.size()[0]//2, 25),
+#                                    color=(0, 0, 0),
+#                                    font_size=34,
+#                                    justification='center',
+#                                    bold=True)
+text_updating = ui.TextBlock2D('Centroids ',
+                               position=(ren_brain.size()[0]+ren_centroids.size()[0]//2, 25),
+                               color=(0, 0, 0),
+                               font_size=34,
+                               justification='center',
+                               bold=True)
 ren_main.add(text_updating)
 
 offset = (ren_main.size()[0] - (ren_brain.size()[0]+ren_centroids.size()[0])) // 2
-text_clusters = actor.text_overlay('12 largest clusters',
-                                   position=(ren_main.size()[0] - offset, 25),
-                                   color=(0, 0, 0),
-                                   font_size=34,
-                                   justification='center',
-                                   bold=True)
+# text_clusters = actor.text_overlay('12 largest clusters',
+#                                    position=(ren_main.size()[0] - offset, 25),
+#                                    color=(0, 0, 0),
+#                                    font_size=34,
+#                                    justification='center',
+#                                    bold=True)
+text_clusters = ui.TextBlock2D('12 largest clusters',
+                               position=(ren_main.size()[0] - offset, 25),
+                               color=(0, 0, 0),
+                               font_size=34,
+                               justification='center',
+                               bold=True)
 ren_main.add(text_clusters)
 
 
@@ -225,12 +249,13 @@ def main_event(speed=1):
 
     last_frame_with_updates = frame
     for i in range(nb_streamlines_to_cluster):
-        cluster_id = qbo.cluster(streamlines[streamline_idx], streamline_idx)
+        # cluster_id = qbo.cluster(streamlines[streamline_idx], streamline_idx)
+        cluster_id = streamline_idx_to_cluster_idx[streamline_idx]
 
         # Display updated centroid
         ren_centroids.RemoveActor(centroid_actors[cluster_id])
-        centroid_actors[cluster_id] = actor.streamtube([qbo.clusters[cluster_id].centroid], colormap[cluster_id], linewidth=0.2+np.log(len(qbo.clusters[cluster_id]))/2)
-        # centroid_actors[cluster_id] = actor.streamtube([qbo.clusters[cluster_id].centroid], (0, 1, 0), linewidth=0.2+np.log(len(qbo.clusters[cluster_id]))/2)
+        # centroid_actors[cluster_id] = actor.streamtube([qbo.clusters[cluster_id].centroid], colormap[cluster_id], linewidth=0.2+np.log(len(qbo.clusters[cluster_id]))/2)
+        centroid_actors[cluster_id] = actor.streamtube([clusters[cluster_id].centroid], colormap[cluster_id], linewidth=0.2+np.log(len(clusters[cluster_id]))/2)
         ren_centroids.add(centroid_actors[cluster_id])
 
         # Highligth streamline being clustered.
@@ -242,8 +267,10 @@ def main_event(speed=1):
 
         # Show streamlines in the clusters view.
         scalars = cluster_actors[cluster_id].GetMapper().GetInput().GetPointData().GetScalars()
-        start = clusters_as_array_sequence[cluster_id]._offsets[len(qbo.clusters[cluster_id])-1]
-        end = start + clusters_as_array_sequence[cluster_id]._lengths[len(qbo.clusters[cluster_id])-1]
+        # start = clusters_as_array_sequence[cluster_id]._offsets[len(qbo.clusters[cluster_id])-1]
+        start = clusters_as_array_sequence[cluster_id]._offsets[len(clusters[cluster_id])-1]
+        # end = start + clusters_as_array_sequence[cluster_id]._lengths[len(qbo.clusters[cluster_id])-1]
+        end = start + clusters_as_array_sequence[cluster_id]._lengths[len(clusters[cluster_id])-1]
         for i in range(start, end):
             scalars.SetValue(i, cluster_id)  # Make streamlines visible.
 
@@ -333,8 +360,10 @@ t += 20
 tm.add_state(t, [brain_actor, clustered_brain_actor], ['off', 'on'])
 
 def change_picking_msg(text_picking):
-    text_picking.set_message('Final clusters')
-    text_picking.Modified()
+    # text_picking.set_message('Final clusters')
+    # text_picking.Modified()
+    text_picking.message = 'Final clusters'
+    text_picking.get_actor().Modified()
 
 tm.add_event(
     t, 20,

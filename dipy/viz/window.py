@@ -398,6 +398,7 @@ class ShowManager(object):
         self.reset_camera = reset_camera
         self.order_transparent = order_transparent
         self.interactor_style = interactor_style
+        self.timers = []
 
         if self.reset_camera:
             self.ren.ResetCamera()
@@ -590,6 +591,15 @@ class ShowManager(object):
         """
         self.window.AddObserver(vtk.vtkCommand.ModifiedEvent, win_callback)
         self.window.Render()
+
+    def add_timer_callback(self, repeat, duration, timer_callback):
+        self.iren.AddObserver("TimerEvent", timer_callback)
+
+        if repeat:
+            timer_id = self.iren.CreateRepeatingTimer(duration)
+        else:
+            timer_id = self.iren.CreateOneShotTimer(duration)
+        self.timers.append(timer_id)
 
 
 def show(ren, title='DIPY', size=(300, 300),
