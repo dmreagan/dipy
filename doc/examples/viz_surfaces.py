@@ -108,19 +108,21 @@ mapper.MapDataArrayToVertexAttribute(
 
 mapper.AddShaderReplacement(
     vtk.vtkShader.Vertex,
-    "//VTK::Normal::Dec",  # replace the normal block
+    "//VTK::ValuePass::Dec",  # replace the ValuePass block
     True,  # before the standard replacements
-    "//VTK::Normal::Dec\n"  # we still want the default
+    "//VTK::ValuePass::Dec\n"  # we still want the default
     "in vec3 color;\n"  # get vertex attribute
     "out vec3 colorVSOutput;\n",  # output to frag shader
     False  # only do it once
 )
 mapper.AddShaderReplacement(
     vtk.vtkShader.Vertex,
-    "//VTK::Normal::Impl",  # replace the normal block
+    "//VTK::ValuePass::Impl",  # replace the ValuePass block
     True,  # before the standard replacements
-    "//VTK::Normal::Impl\n"  # we still want the default
-    "colorVSOutput = color;\n",  # pass through attribute
+    "//VTK::ValuePass::Impl\n"  # we still want the default
+    "colorVSOutput = color;\n"  # pass through attribute
+    # use the color to manipulate the positions into something weird
+    "gl_Position = gl_Position * vec4(normalize(color), 1.0);\n",
     False  # only do it once
 )
 # now modify the fragment shader
@@ -137,7 +139,7 @@ mapper.AddShaderReplacement(
     "//VTK::Normal::Impl",  # replace the normal block
     True,  # before the standard replacements
     "//VTK::Normal::Impl\n"  # we still want the default calc
-    "diffuseColor = colorVSOutput / 255;\n",  # convert from [0, 255] -> [0,1]
+    "diffuseColor = colorVSOutput / 255;\n",  # convert from [0, 255] -> [0, 1]
     False  # only do it once
 )
 
