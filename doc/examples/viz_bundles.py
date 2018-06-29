@@ -53,6 +53,9 @@ renderer = window.Renderer()
 
 stream_actor = actor.line(bundle_native)
 
+stream_actor.GetProperty().SetLineWidth(5)
+stream_actor.GetProperty().SetRenderLinesAsTubes(1)
+
 renderer.set_camera(position=(-176.42, 118.52, 128.20),
                     focal_point=(113.30, 128.31, 76.56),
                     view_up=(0.18, 0.00, 0.98))
@@ -60,8 +63,8 @@ renderer.set_camera(position=(-176.42, 118.52, 128.20),
 renderer.add(stream_actor)
 
 # Uncomment the line below to show to display the window
-# window.show(renderer, size=(600, 600), reset_camera=False)
-window.record(renderer, out_path='bundle1.png', size=(600, 600))
+window.show(renderer, size=(600, 600), reset_camera=False)
+# window.record(renderer, out_path='bundle1.png', size=(600, 600))
 
 """
 .. figure:: bundle1.png
@@ -87,6 +90,97 @@ Here we will need to input the ``fa`` map in ``streamtube`` or ``line``.
 renderer.clear()
 stream_actor2 = actor.line(bundle_native, fa, linewidth=0.1)
 
+stream_actor2.GetProperty().SetLineWidth(5)
+# stream_actor2.GetProperty().SetRenderLinesAsTubes(1)
+
+stream_mapper = stream_actor.GetMapper()
+
+stream_mapper.SetGeometryShaderCode(
+    "//VTK::System::Dec\n"
+
+    "// Template for the polydata mappers geometry shader\n"
+
+    "// VC position of this fragment\n"
+    "//VTK::PositionVC::Dec\n"
+
+    "// primitiveID\n"
+    "//VTK::PrimID::Dec\n"
+
+    "// optional color passed in from the vertex shader, vertexColor\n"
+    "//VTK::Color::Dec\n"
+
+    "// optional surface normal declaration\n"
+    "//VTK::Normal::Dec\n"
+
+    "// extra lighting parameters\n"
+    "//VTK::Light::Dec\n"
+
+    "// Texture coordinates\n"
+    "//VTK::TCoord::Dec\n"
+
+    "// picking support\n"
+    "//VTK::Picking::Dec\n"
+
+    "// Depth Peeling Support\n"
+    "//VTK::DepthPeeling::Dec\n"
+
+    "// clipping plane vars\n"
+    "//VTK::Clip::Dec\n"
+
+    "// the output of this shader\n"
+    "//VTK::Output::Dec\n"
+
+    "uniform vec2 lineWidthNVC;\n"
+
+    "layout(lines) in;\n"
+    "layout(triangle_strip, max_vertices = 4) out;\n"
+
+    "void main()\n"
+    "{\n"
+    "   // compute the lines direction\n"
+    "   vec2 normal = normalize(\n"
+    "       gl_in[1].gl_Position.xy/gl_in[1].gl_Position.w -\n"
+    "       gl_in[0].gl_Position.xy/gl_in[0].gl_Position.w);\n"
+
+    "   // rotate 90 degrees\n"
+    "   normal = vec2(-1.0*normal.y,normal.x);\n"
+
+    "   //VTK::Normal::Start\n"
+
+    "   for (int j = 0; j < 4; j++)\n"
+    "   {\n"
+    "       int i = j/2;\n"
+
+    "       //VTK::PrimID::Impl\n"
+
+    "       //VTK::Clip::Impl\n"
+
+    "       //VTK::Color::Impl\n"
+
+    "       //VTK::Normal::Impl\n"
+
+    "       //VTK::Light::Impl\n"
+
+    "       //VTK::TCoord::Impl\n"
+
+    "       //VTK::DepthPeeling::Impl\n"
+
+    "       //VTK::Picking::Impl\n"
+
+    "       // VC position of this fragment\n"
+    "       //VTK::PositionVC::Impl\n"
+
+    "       gl_Position = vec4(\n"
+    "           gl_in[i].gl_Position.xy + (lineWidthNVC*normal)*((j+1)%2 - 0.5)*gl_in[i].gl_Position.w,\n"
+    "           gl_in[i].gl_Position.z,\n"
+    "           gl_in[i].gl_Position.w);\n"
+    "           EmitVertex();\n"
+    "   }\n"
+    "   EndPrimitive();\n"
+    "}"
+)
+
+
 """
 We can also show the scalar bar.
 """
@@ -94,10 +188,10 @@ We can also show the scalar bar.
 bar = actor.scalar_bar()
 
 renderer.add(stream_actor2)
-renderer.add(bar)
+# renderer.add(bar)
 
-# window.show(renderer, size=(600, 600), reset_camera=False)
-window.record(renderer, out_path='bundle2.png', size=(600, 600))
+window.show(renderer, size=(600, 600), reset_camera=False)
+# window.record(renderer, out_path='bundle2.png', size=(600, 600))
 
 """
 .. figure:: bundle2.png
@@ -127,7 +221,7 @@ renderer.add(stream_actor3)
 renderer.add(bar2)
 
 # window.show(renderer, size=(600, 600), reset_camera=False)
-window.record(renderer, out_path='bundle3.png', size=(600, 600))
+# window.record(renderer, out_path='bundle3.png', size=(600, 600))
 
 """
 .. figure:: bundle3.png
@@ -149,7 +243,7 @@ stream_actor4 = actor.line(bundle_native, (1., 0.5, 0), linewidth=0.1)
 renderer.add(stream_actor4)
 
 # window.show(renderer, size=(600, 600), reset_camera=False)
-window.record(renderer, out_path='bundle4.png', size=(600, 600))
+# window.record(renderer, out_path='bundle4.png', size=(600, 600))
 
 """
 .. figure:: bundle4.png
@@ -187,7 +281,7 @@ bar3 = actor.scalar_bar(lut_cmap)
 renderer.add(bar3)
 
 # window.show(renderer, size=(600, 600), reset_camera=False)
-window.record(renderer, out_path='bundle5.png', size=(600, 600))
+# window.record(renderer, out_path='bundle5.png', size=(600, 600))
 
 """
 .. figure:: bundle5.png
@@ -212,7 +306,7 @@ stream_actor6 = actor.line(bundle_native, colors, linewidth=0.2)
 renderer.add(stream_actor6)
 
 # window.show(renderer, size=(600, 600), reset_camera=False)
-window.record(renderer, out_path='bundle6.png', size=(600, 600))
+# window.record(renderer, out_path='bundle6.png', size=(600, 600))
 
 """
 .. figure:: bundle6.png
