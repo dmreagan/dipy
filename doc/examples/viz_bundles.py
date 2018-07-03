@@ -93,7 +93,7 @@ stream_actor2 = actor.line(bundle_native, fa, linewidth=0.1)
 stream_actor2.GetProperty().SetLineWidth(5)
 # stream_actor2.GetProperty().SetRenderLinesAsTubes(1)
 
-stream_mapper = stream_actor.GetMapper()
+stream_mapper = stream_actor2.GetMapper()
 
 stream_mapper.SetGeometryShaderCode(
     "//VTK::System::Dec\n"
@@ -174,10 +174,24 @@ stream_mapper.SetGeometryShaderCode(
     "           gl_in[i].gl_Position.xy + (lineWidthNVC*normal)*((j+1)%2 - 0.5)*gl_in[i].gl_Position.w,\n"
     "           gl_in[i].gl_Position.z,\n"
     "           gl_in[i].gl_Position.w);\n"
-    "           EmitVertex();\n"
+    "       EmitVertex();\n"
     "   }\n"
     "   EndPrimitive();\n"
     "}"
+)
+
+stream_mapper.SetFragmentShaderCode(
+    "//VTK::System::Dec\n"  # always start with this line
+    "//VTK::Output::Dec\n"  # always have this line in your FS
+    "varying vec3 normalVCVSOutput;\n"
+    "uniform vec3 diffuseColorUniform;\n"
+    "void main () {\n"
+    "  float df = max(0.0, normalVCVSOutput.z);\n"
+    "  float sf = pow(df, 20.0);\n"
+    "  vec3 diffuse = df * diffuseColorUniform;\n"
+    "  vec3 specular = sf * vec3(0.4,0.4,0.4);\n"
+    "  gl_FragData[0] = vec4(1.0, 0.0, 0.0, 1.0);\n"
+    "}\n"
 )
 
 
