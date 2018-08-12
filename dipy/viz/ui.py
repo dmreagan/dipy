@@ -3299,4 +3299,3 @@ class ListBoxItem2D(UI):
         range_select = i_ren.event.shift_key
         self.list_box.select(self, multiselect, range_select)
         i_ren.force_render()
-        i_ren.event.abort()  # Stop propagating the event.
