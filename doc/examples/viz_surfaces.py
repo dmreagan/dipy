@@ -129,7 +129,7 @@ cube_mapper.SetGeometryShaderCode("""
     //VTK::Output::Dec
 
     layout(lines) in;
-    layout(triangle_strip, max_vertices = 5) out;
+    layout(triangle_strip, max_vertices = 6) out;
 
     void build_house(vec4 position)
     {
