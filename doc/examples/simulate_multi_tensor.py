@@ -43,25 +43,25 @@ The function ``multi_tensor`` will return the simulated signal and an array
 with the principal axes of the tensors in cartesian coordinates.
 """
 
-signal, sticks = multi_tensor(gtab, mevals, S0=100, angles=angles,
-                         fractions=fractions, snr=None)
+# signal, sticks = multi_tensor(gtab, mevals, S0=100, angles=angles,
+#                          fractions=fractions, snr=None)
 
 """
 We can also add Rician noise with a specific SNR.
 """
 
-signal_noisy, sticks = multi_tensor(gtab, mevals, S0=100, angles=angles,
-                         fractions=fractions, snr=20)
+# signal_noisy, sticks = multi_tensor(gtab, mevals, S0=100, angles=angles,
+#                          fractions=fractions, snr=20)
 
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
-plt.plot(signal, label='noiseless')
+# plt.plot(signal, label='noiseless')
 
-plt.plot(signal_noisy, label='with noise')
-plt.legend()
-#plt.show()
-plt.savefig('simulated_signal.png')
+# plt.plot(signal_noisy, label='with noise')
+# plt.legend()
+# plt.show()
+# plt.savefig('simulated_signal.png')
 
 """
 .. figure:: simulated_signal.png
@@ -85,7 +85,7 @@ odf = multi_tensor_odf(sphere.vertices, mevals, angles, fractions)
 from dipy.viz import window, actor
 
 # Enables/disables interactive visualization
-interactive = False
+interactive = True
 
 ren = window.Renderer()
 
@@ -95,7 +95,7 @@ odf_actor.RotateX(90)
 ren.add(odf_actor)
 
 print('Saving illustration as multi_tensor_simulation')
-window.record(ren, out_path='multi_tensor_simulation.png', size=(300, 300))
+# window.record(ren, out_path='multi_tensor_simulation.png', size=(300, 300))
 if interactive:
     window.show(ren)
 
