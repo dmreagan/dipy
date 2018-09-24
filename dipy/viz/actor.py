@@ -886,10 +886,10 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
         vtk_colors.SetName("Colors")
 
     
-
+    # all_ms = all_ms * 0
     # all_ms_vtk = numpy_to_vtk_points(all_ms)
-    all_ms_vtk = numpy_support.numpy_to_vtk(all_ms, deep=True, array_type=vtk.VTK_FLOAT)
-    # print(all_ms_vtk)
+    all_ms_vtk = numpy_support.numpy_to_vtk(all_ms[0].ravel(), deep=0, array_type=vtk.VTK_FLOAT)
+    
     all_ms_vtk.SetName('ms')
 
 
@@ -902,12 +902,13 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
     # have to figure out how best to get ms data into VS
     # only SetScalars() seems to work, but can't set more than one
     # how to get both ms and colors into VS?
-    polydata.GetPointData().SetScalars(all_ms_vtk)
+    # polydata.GetPointData().SetScalars(all_ms_vtk)
+    polydata.GetPointData().AddArray(all_ms_vtk)
 
 
 
-    # if colormap is not None:
-    #     polydata.GetPointData().SetScalars(vtk_colors)
+    if colormap is not None:
+        polydata.GetPointData().SetScalars(vtk_colors)
 
     mapper = vtk.vtkPolyDataMapper()
     if major_version <= 5:
@@ -915,10 +916,36 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
     else:
         mapper.SetInputData(polydata)
 
+    # print(mapper.GetInput().GetPointData().GetAbstractArray('ms'))
 
+    mapper.MapDataArrayToVertexAttribute('odf',
+                                         'ms',
+                                         vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
+                                         -1)
+    
+    # declare input ODF value
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        '//VTK::PositionVC::Dec',
+        True,
+        '''
+        //VTK::PositionVC::Dec
+        in float odf;
+        ''',
+        False
+    )
 
-
-    print(mapper.GetInput().GetPointData().GetScalars())
+    # calculate new position with ODF
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        '//VTK::PositionVC::Impl',
+        True,
+        '''
+        //VTK::PositionVC::Impl
+        gl_Position = gl_Position + odf;
+        ''',
+        False
+    )
 
     # debug block
     # mapper.AddShaderReplacement(

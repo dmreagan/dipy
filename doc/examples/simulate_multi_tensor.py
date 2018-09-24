@@ -97,7 +97,7 @@ ren.add(odf_actor)
 print('Saving illustration as multi_tensor_simulation')
 # window.record(ren, out_path='multi_tensor_simulation.png', size=(300, 300))
 if interactive:
-    window.show(ren)
+    window.show(ren, size=(500, 500))
 
 
 """
