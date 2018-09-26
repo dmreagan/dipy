@@ -834,10 +834,7 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
         if norm:
             m /= np.abs(m).max()
 
-        # if radial_scale:
-        #     xyz = vertices * m[:, None]
-        # else:
-            xyz = vertices.copy()
+        xyz = vertices.copy()
 
         all_xyz.append(scale * xyz + center)
         all_faces.append(faces + k * xyz.shape[0])
@@ -884,28 +881,14 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
             array_type=vtk.VTK_UNSIGNED_CHAR)
 
         vtk_colors.SetName("Colors")
-
-    
-    # all_ms = all_ms * 0
-    # all_ms_vtk = numpy_to_vtk_points(all_ms)
-    all_ms_vtk = numpy_support.numpy_to_vtk(all_ms[0].ravel(), deep=0, array_type=vtk.VTK_FLOAT)
-    
+ 
+    all_ms_vtk = numpy_support.numpy_to_vtk(all_ms[0], deep=0, array_type=vtk.VTK_FLOAT)
     all_ms_vtk.SetName('ms')
-
-
 
     polydata = vtk.vtkPolyData()
     polydata.SetPoints(points)
     polydata.SetPolys(cells)
-
-
-    # have to figure out how best to get ms data into VS
-    # only SetScalars() seems to work, but can't set more than one
-    # how to get both ms and colors into VS?
-    # polydata.GetPointData().SetScalars(all_ms_vtk)
     polydata.GetPointData().AddArray(all_ms_vtk)
-
-
 
     if colormap is not None:
         polydata.GetPointData().SetScalars(vtk_colors)
@@ -916,13 +899,12 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
     else:
         mapper.SetInputData(polydata)
 
-    # print(mapper.GetInput().GetPointData().GetAbstractArray('ms'))
-
+    fieldAssociation = vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS
     mapper.MapDataArrayToVertexAttribute('odf',
                                          'ms',
-                                         vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS,
+                                         fieldAssociation,
                                          -1)
-    
+
     # declare input ODF value
     mapper.AddShaderReplacement(
         vtk.vtkShader.Vertex,
@@ -931,18 +913,24 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
         '''
         //VTK::PositionVC::Dec
         in float odf;
+        uniform bool radialScale;
         ''',
         False
     )
 
     # calculate new position with ODF
+    # note that we do not include the normal
+    # //VTK::PositionVC::Impl template
+    # we must reimplement it to scale by ODF
     mapper.AddShaderReplacement(
         vtk.vtkShader.Vertex,
         '//VTK::PositionVC::Impl',
         True,
         '''
-        //VTK::PositionVC::Impl
-        gl_Position = gl_Position + odf;
+        vec4 vertexOdfMC = vertexMC;
+        if (radialScale) vertexOdfMC.xyz = vertexOdfMC.xyz * odf;
+        vertexVCVSOutput = MCVCMatrix * vertexOdfMC;
+        gl_Position = MCDCMatrix * vertexOdfMC;
         ''',
         False
     )
@@ -958,6 +946,15 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
     #     ''',
     #     False
     # )
+
+    @vtk.calldata_type(vtk.VTK_OBJECT)
+    def vtkShaderCallback(caller, event, calldata=None):
+        program = calldata
+        if program is not None:
+            program.SetUniformi("radialScale", int(radial_scale))
+
+    mapper.AddObserver(vtk.vtkCommand.UpdateShaderEvent,
+                       vtkShaderCallback)
 
     return mapper
 
