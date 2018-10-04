@@ -827,6 +827,7 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
     all_xyz = []
     all_faces = []
     all_ms = []
+    all_centers = []
     for (k, center) in enumerate(ijk):
 
         m = odfs[tuple(center.astype(np.int))].copy()
@@ -839,6 +840,9 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
         all_xyz.append(scale * xyz + center)
         all_faces.append(faces + k * xyz.shape[0])
         all_ms.append(m)
+
+        # each vertex needs the center of its sphere for ODF scaling in VS
+        all_centers.append(np.tile(center, (xyz.shape[0], 1)))
 
     all_xyz = np.ascontiguousarray(np.concatenate(all_xyz))
     all_xyz_vtk = numpy_support.numpy_to_vtk(all_xyz, deep=True)
@@ -881,14 +885,22 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
             array_type=vtk.VTK_UNSIGNED_CHAR)
 
         vtk_colors.SetName("Colors")
- 
-    all_ms_vtk = numpy_support.numpy_to_vtk(all_ms[0], deep=0, array_type=vtk.VTK_FLOAT)
+
+    all_ms = np.ascontiguousarray(np.concatenate(all_ms), dtype='f4')
+    all_ms_vtk = numpy_support.numpy_to_vtk(all_ms.ravel(),
+                                            deep=0,
+                                            array_type=vtk.VTK_FLOAT)
     all_ms_vtk.SetName('ms')
+
+    all_centers = np.ascontiguousarray(np.concatenate(all_centers))
+    all_centers_vtk = numpy_support.numpy_to_vtk(all_centers, deep=True)
+    all_centers_vtk.SetName('centers')
 
     polydata = vtk.vtkPolyData()
     polydata.SetPoints(points)
     polydata.SetPolys(cells)
     polydata.GetPointData().AddArray(all_ms_vtk)
+    polydata.GetPointData().AddArray(all_centers_vtk)
 
     if colormap is not None:
         polydata.GetPointData().SetScalars(vtk_colors)
@@ -899,10 +911,14 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
     else:
         mapper.SetInputData(polydata)
 
-    fieldAssociation = vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS
+    field_association = vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS
     mapper.MapDataArrayToVertexAttribute('odf',
                                          'ms',
-                                         fieldAssociation,
+                                         field_association,
+                                         -1)
+    mapper.MapDataArrayToVertexAttribute('center',
+                                         'centers',
+                                         field_association,
                                          -1)
 
     # declare input ODF value
@@ -913,13 +929,15 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
         '''
         //VTK::PositionVC::Dec
         in float odf;
+        in vec3 center;
+        out vec3 centerVSOutput;
         uniform bool radialScale;
         ''',
         False
     )
 
     # calculate new position with ODF
-    # note that we do not include the normal
+    # note that we do not include the usual
     # //VTK::PositionVC::Impl template
     # we must reimplement it to scale by ODF
     mapper.AddShaderReplacement(
@@ -927,13 +945,55 @@ def _odf_slicer_mapper_vs(odfs, affine=None, mask=None, sphere=None, scale=2.2,
         '//VTK::PositionVC::Impl',
         True,
         '''
+        mat4 translateToOrigin = mat4(1.0, 0.0, 0.0, 0.0,
+                                      0.0, 1.0, 0.0, 0.0,
+                                      0.0, 0.0, 1.0, 0.0,
+                                      -center.x, -center.y, -center.z, 1.0);
+        mat4 translateBackToGrid = mat4(1.0, 0.0, 0.0, 0.0,
+                                        0.0, 1.0, 0.0, 0.0,
+                                        0.0, 0.0, 1.0, 0.0,
+                                        center.x, center.y, center.z, 1.0);
         vec4 vertexOdfMC = vertexMC;
-        if (radialScale) vertexOdfMC.xyz = vertexOdfMC.xyz * odf;
+
+        if (radialScale) {
+            // must move sphere to origin for proper scaling
+            vertexOdfMC = translateToOrigin * vertexOdfMC;
+            vertexOdfMC.xyz = vertexOdfMC.xyz * odf;
+            vertexOdfMC = translateBackToGrid * vertexOdfMC;
+        }
+
         vertexVCVSOutput = MCVCMatrix * vertexOdfMC;
         gl_Position = MCDCMatrix * vertexOdfMC;
+
+        //centerVSOutput = center; // output center to FS for debugging
         ''',
         False
     )
+
+    # declare input center
+    # mapper.AddShaderReplacement(
+    #     vtk.vtkShader.Fragment,
+    #     '//VTK::Coincident::Dec',
+    #     True,
+    #     '''
+    #     //VTK::Coincident::Dec
+    #     in vec3 centerVSOutput;
+    #     ''',
+    #     False
+    # )
+
+    # color by center
+    # mapper.AddShaderReplacement(
+    #     vtk.vtkShader.Fragment,
+    #     '//VTK::Coincident::Impl',
+    #     True,
+    #     '''
+    #     //VTK::Coincident::Impl
+    #     fragOutput0 = vec4(centerVSOutput/30.0, 1);
+    #     //fragOutput0 = vec4(0.5, 0, 0.5, 1);
+    #     ''',
+    #     False
+    # )
 
     # debug block
     # mapper.AddShaderReplacement(
