@@ -3463,7 +3463,7 @@ class Orbit(UI):
         """
         super(Orbit, self).__init__(position)
         self._disk.SetInnerRadius(radius)
-        self._disk.SetOuterRadius(radius+1)
+        self._disk.SetOuterRadius(radius+(radius * 0.02))
         self._disk.Update()
 
     def _get_actors(self):
